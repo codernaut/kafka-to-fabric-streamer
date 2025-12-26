@@ -1,0 +1,41 @@
+version: "3.9"
+
+services:
+  redpanda:
+    image: docker.redpanda.com/vectorized/redpanda:v23.3.10
+    command:
+      - redpanda
+      - start
+      - --smp
+      - "1"
+      - --memory
+      - "1G"
+      - --overprovisioned
+      - --kafka-addr
+      - PLAINTEXT://0.0.0.0:9092,PLAINTEXT_HOST://0.0.0.0:29092
+      - --advertise-kafka-addr
+      - PLAINTEXT://redpanda:9092,PLAINTEXT_HOST://localhost:29092
+    ports:
+      - "29092:29092"
+      - "9644:9644"
+    healthcheck:
+      test: ["CMD", "rpk", "cluster", "info", "--brokers", "redpanda:9092"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  streamer:
+    build: .
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: redpanda:9092
+      EVENTHUBS_ENABLED: "false"
+      EVENTHUBS_CONNECTION_STRING: ""
+      EVENTHUBS_HUB_NAME: drilling-telemetry
+      QUARKUS_HTTP_HOST: 0.0.0.0
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
